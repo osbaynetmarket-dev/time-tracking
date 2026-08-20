@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Clock, Briefcase, FileText, Calendar, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock, Briefcase, FileText, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
+
+/** Strip HTML tags and whitespace to detect truly empty rich-text content. */
+const isRichTextEmpty = (html: string) => {
+  const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  return text.length === 0;
+};
 
 interface Project {
   id: string;
@@ -25,27 +31,71 @@ const toDateKey = (date: Date) => {
 
 export default function TimeLogForm({ userId, projects, onLogAdded }: TimeLogFormProps) {
   const today = new Date();
-  const dateCandidates = [0, 1, 2].map((offset) => {
+  const allDateCandidates = [0, 1, 2].map((offset) => {
     const d = new Date(today);
     d.setDate(today.getDate() - offset);
     return d;
   });
 
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [isLoadingBlockedDates, setIsLoadingBlockedDates] = useState(true);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
-  const [date, setDate] = useState(toDateKey(dateCandidates[0]));
+  const [date, setDate] = useState('');
   const [hours, setHours] = useState('');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Fetch blocked dates on component mount
+  useEffect(() => {
+    const fetchBlockedDates = async () => {
+      try {
+        setIsLoadingBlockedDates(true);
+        const res = await fetch(`/api/time-logs/blocked-dates?userId=${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBlockedDates(data.blockedDates || []);
+        } else {
+          console.error('Failed to fetch blocked dates');
+          setBlockedDates([]);
+        }
+      } catch (err) {
+        console.error('Error fetching blocked dates:', err);
+        setBlockedDates([]);
+      } finally {
+        setIsLoadingBlockedDates(false);
+      }
+    };
+
+    fetchBlockedDates();
+  }, [userId]);
+
+  // Filter out blocked dates from candidates
+  const dateCandidates = allDateCandidates.filter((d) => {
+    const key = toDateKey(d);
+    return !blockedDates.includes(key);
+  });
+
+  // Set initial date when blocked dates are loaded and candidates are available
+  useEffect(() => {
+    if (!isLoadingBlockedDates && dateCandidates.length > 0 && !date) {
+      setDate(toDateKey(dateCandidates[0]));
+    }
+  }, [isLoadingBlockedDates, dateCandidates.length, date]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (!projectId || !hours || !description || !date) {
+    if (!projectId || !hours || !date) {
       setError('Please fill in all fields.');
+      return;
+    }
+
+    if (!description || isRichTextEmpty(description)) {
+      setError('Description is required.');
       return;
     }
 
@@ -79,6 +129,50 @@ export default function TimeLogForm({ userId, projects, onLogAdded }: TimeLogFor
     }
   };
 
+  // Show loading state while fetching blocked dates
+  if (isLoadingBlockedDates) {
+    return (
+      <div className="glass-panel rounded-xl p-6 relative overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-primary/20 text-primary">
+            <Clock size={20} />
+          </div>
+          <h2 className="text-xl font-bold">Log Time</h2>
+        </div>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={24} className="animate-spin text-primary" />
+          <span className="ml-2 text-slate-400">Loading available dates...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no dates are available
+  if (dateCandidates.length === 0) {
+    return (
+      <div className="glass-panel rounded-xl p-6 relative overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-primary/20 text-primary">
+            <Clock size={20} />
+          </div>
+          <h2 className="text-xl font-bold">Log Time</h2>
+        </div>
+        <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 flex items-start gap-3">
+          <AlertCircle size={20} className="text-warning flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-warning font-medium mb-1">No Available Dates</p>
+            <p className="text-slate-400 text-sm">
+              All dates within the allowed window (today, yesterday, and the day before) already have time logs in approved reports. 
+              You cannot create new time logs for dates that have been approved.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-panel rounded-xl p-6 relative overflow-hidden">
       {/* Decorative gradient orb */}
@@ -95,6 +189,15 @@ export default function TimeLogForm({ userId, projects, onLogAdded }: TimeLogFor
         {error && (
           <div className="p-3 rounded-lg bg-danger/10 text-danger text-sm border border-danger/20">
             {error}
+          </div>
+        )}
+
+        {blockedDates.length > 0 && (
+          <div className="p-3 rounded-lg bg-info/10 border border-info/20 flex items-start gap-2">
+            <AlertCircle size={16} className="text-info flex-shrink-0 mt-0.5" />
+            <p className="text-info text-xs">
+              Some dates are unavailable because they have time logs in approved reports.
+            </p>
           </div>
         )}
 
@@ -172,7 +275,7 @@ export default function TimeLogForm({ userId, projects, onLogAdded }: TimeLogFor
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-2">
             <FileText size={14} className="text-slate-400" />
-            Description
+            Description <span className="text-danger">*</span>
           </label>
           <RichTextEditor
             value={description}

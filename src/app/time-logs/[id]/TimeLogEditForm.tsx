@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Clock, FileText, Loader2, Trash2 } from 'lucide-react';
 import RichTextEditor from '@/components/RichTextEditor';
 
+/** Strip HTML tags and whitespace to detect truly empty rich-text content. */
+const isRichTextEmpty = (html: string) => {
+  const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  return text.length === 0;
+};
+
 interface TimeLogEditFormProps {
   timeLog: {
     id: string;
@@ -28,8 +34,13 @@ export default function TimeLogEditForm({ timeLog, userId }: TimeLogEditFormProp
     e.preventDefault();
     setError('');
 
-    if (!hours || !description) {
+    if (!hours) {
       setError('Please fill in all fields.');
+      return;
+    }
+
+    if (!description || isRichTextEmpty(description)) {
+      setError('Description is required.');
       return;
     }
 
@@ -142,7 +153,7 @@ export default function TimeLogEditForm({ timeLog, userId }: TimeLogEditFormProp
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-2">
             <FileText size={14} className="text-slate-400" />
-            Description
+            Description <span className="text-danger">*</span>
           </label>
           <RichTextEditor
             value={description}

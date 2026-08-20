@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Calculator, DollarSign, Edit, Eye } from 'lucide-react';
 import Link from 'next/link';
+import Form from 'next/form';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,7 +115,7 @@ export default async function PayrollPage(
           </span>
         </div>
         {canManagePayroll && (
-          <form method="GET" className="p-6 border-b border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Form action="/payroll" className="p-6 border-b border-white/5 grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-400 uppercase">Month</label>
               <input
@@ -166,7 +167,7 @@ export default async function PayrollPage(
                 Reset
               </Link>
             </div>
-          </form>
+          </Form>
         )}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

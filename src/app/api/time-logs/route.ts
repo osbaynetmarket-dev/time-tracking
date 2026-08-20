@@ -10,6 +10,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A project must be selected.' }, { status: 400 });
     }
 
+    if (!description || description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length === 0) {
+      return NextResponse.json({ error: 'Description is required.' }, { status: 400 });
+    }
+
     const logDate = new Date(date);
     if (Number.isNaN(logDate.getTime())) {
       return NextResponse.json({ error: 'Invalid date provided' }, { status: 400 });
@@ -32,6 +36,40 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Calculate day boundaries for validation checks
+    const dayStart = new Date(logDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(logDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    // Check if the user has ANY time logs on this date that are part of approved reports
+    const approvedTimeLogOnDate = await prisma.timeLog.findFirst({
+      where: {
+        userId,
+        date: { gte: dayStart, lte: dayEnd },
+        reportId: { not: null },
+        report: {
+          status: { in: ['APPROVED', 'LATE'] },
+        },
+      },
+      include: {
+        project: { select: { name: true } },
+      },
+    });
+
+    if (approvedTimeLogOnDate) {
+      return NextResponse.json(
+        {
+          error: `You cannot create a new time log for ${logDate.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })} because you already have a time log for ${approvedTimeLogOnDate.project.name} on this date that is part of an approved report.`,
+        },
+        { status: 403 }
+      );
+    }
+
     // Validate the user is assigned to this project
     const assignment = await prisma.projectUser.findUnique({
       where: { userId_projectId: { userId, projectId } },
@@ -42,10 +80,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Enforce one time log per user per project per calendar day
-    const dayStart = new Date(logDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(logDate);
-    dayEnd.setHours(23, 59, 59, 999);
 
     const existing = await prisma.timeLog.findFirst({
       where: {

@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import DashboardLayout from '@/components/DashboardLayout';
 import { ReportFilters } from '@/components/ReportFilters';
-import { FileText, Eye } from 'lucide-react';
-import Link from 'next/link';
+import { FileText } from 'lucide-react';
+import { ReportsTableClient } from './ReportsTableClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,74 +98,21 @@ export default async function ReportsPage(
         </div>
         
         {isAdminOrAccounting && <ReportFilters users={allUsers} />}
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-white/[0.02] border-b border-white/5">
-                <th className="p-4 text-xs font-semibold text-slate-400 uppercase">Report Date</th>
-                <th className="p-4 text-xs font-semibold text-slate-400 uppercase">Staff Member</th>
-                <th className="p-4 text-xs font-semibold text-slate-400 uppercase">Projects</th>
-                <th className="p-4 text-xs font-semibold text-slate-400 uppercase">Total Hours</th>
-                <th className="p-4 text-xs font-semibold text-slate-400 uppercase">Status</th>
-                {isAdminOrAccounting && (
-                  <th className="p-4 text-xs font-semibold text-slate-400 uppercase text-right">Actions</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {allReports.map(report => (
-                <tr key={report.id} className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm font-medium text-white">
-                    {new Date(report.date).toLocaleDateString()}
-                  </td>
-                  <td className="p-4 text-sm text-slate-300">{report.user.name}</td>
-                  <td className="p-4 text-sm text-slate-300">
-                    <div className="flex flex-wrap gap-1">
-                      {report.timeLogs.length > 0
-                        ? report.timeLogs.map((log) => (
-                            <span key={log.project.id} className="px-2 py-0.5 bg-white/5 rounded text-xs whitespace-nowrap">
-                              {log.project.name}
-                            </span>
-                          ))
-                        : <span className="px-2 py-0.5 bg-white/5 rounded text-xs">{report.project.name}</span>
-                      }
-                    </div>
-                  </td>
-                  <td className="p-4 text-sm font-medium">{report.totalHours} hrs</td>
-                  <td className="p-4 text-sm">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                      report.status === 'APPROVED' ? 'bg-success/10 text-success border-success/20' :
-                      report.status === 'LATE' ? 'bg-danger/10 text-danger border-danger/20' :
-                      report.status === 'PENDING' ? 'bg-warning/10 text-warning border-warning/20' :
-                      report.status === 'REJECTED' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' : ''
-                    }`}>
-                      {report.status}
-                    </span>
-                  </td>
-                  {isAdminOrAccounting && (
-                    <td className="p-4 text-right whitespace-nowrap">
-                      <Link 
-                        href={`/reports/${report.id}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-md transition-colors text-sm"
-                      >
-                        <Eye size={14} />
-                        View
-                      </Link>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {allReports.length === 0 && (
-                <tr>
-                  <td colSpan={isAdminOrAccounting ? 6 : 5} className="p-8 text-center text-slate-400">
-                    No reports found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        <ReportsTableClient
+          reports={allReports.map(report => ({
+            id: report.id,
+            date: report.date.toISOString(),
+            status: report.status,
+            totalHours: report.totalHours,
+            user: { id: report.user.id, name: report.user.name },
+            project: { id: report.project.id, name: report.project.name },
+            timeLogs: report.timeLogs.map(log => ({
+              project: { id: log.project.id, name: log.project.name }
+            }))
+          }))}
+          isAdminOrAccounting={isAdminOrAccounting}
+        />
       </div>
     </DashboardLayout>
   );

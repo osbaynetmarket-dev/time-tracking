@@ -10,6 +10,10 @@ export async function PUT(
     const body = await req.json();
     const { userId, hours, description } = body;
 
+    if (!description || description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length === 0) {
+      return NextResponse.json({ error: 'Description is required.' }, { status: 400 });
+    }
+
     // Find the time log
     const timeLog = await prisma.timeLog.findUnique({
       where: { id },

@@ -39,9 +39,10 @@ export function ApprovalClient({ action, reportId }: ApprovalClientProps) {
         onClick={handleClick}
         disabled={isLoading}
         title="Approve"
-        className="p-1.5 text-success hover:bg-success/10 rounded-md transition-colors disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-success/20 hover:bg-success/30 text-success rounded-md transition-colors text-sm disabled:opacity-50"
       >
-        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+        {isLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+        Approve
       </button>
     );
   }
